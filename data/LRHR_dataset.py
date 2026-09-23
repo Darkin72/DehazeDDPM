@@ -69,13 +69,21 @@ class LRHRDataset(Dataset):
         input_key, gt_key = keys
         input_paths = list(self.scandir(input_folder))
         gt_paths = list(self.scandir(gt_folder))
+        gt_lookup = {osp.splitext(osp.basename(path))[0].lower(): path for path in gt_paths}
         paths = []
 
         for lq_path in input_paths:
             basename, ext = osp.splitext(osp.basename(lq_path))
-            #basename = basename.split("_")[0]
-            input_name = basename + ext
-            gt_path = osp.join(gt_folder, input_name)
+            gt_relative = gt_lookup.get(basename.lower())
+            if gt_relative is None:
+                # SOTS hazy files use names such as ``1447_3.png`` while
+                # the clear target is ``1447.png``.
+                gt_relative = gt_lookup.get(basename.rsplit("_", 1)[0].lower())
+            if gt_relative is None:
+                raise FileNotFoundError(
+                    f"No clear target found for hazy image: {lq_path}"
+                )
+            gt_path = osp.join(gt_folder, gt_relative)
             input_path = osp.join(input_folder, lq_path)
             paths.append(dict([(f'{input_key}_path', input_path), (f'{gt_key}_path', gt_path)]))
         return paths
